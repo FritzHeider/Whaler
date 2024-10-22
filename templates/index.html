@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whale Transaction Tracker</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        #dashboard {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .graph-container {
+            width: 45%;
+            margin: 20px;
+        }
+        #correlation {
+            width: 100%;
+            margin: 20px;
+            text-align: center;
+            font-size: 1.5em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ethereum Whale Transaction Tracker</h1>
+
+    <div id="dashboard">
+        <!-- Whale Transaction Bar Graph -->
+        <div id="whale-graph" class="graph-container" style="height:400px;"></div>
+
+        <!-- Whale Transactions Over Time (Line Graph) -->
+        <div id="whale-over-time" class="graph-container" style="height:400px;"></div>
+
+        <!-- Transaction Distribution (Pie Chart) -->
+        <div id="transaction-distribution" class="graph-container" style="height:400px;"></div>
+
+        <!-- Total ETH Moved by Whale Transactions (Gauge) -->
+        <div id="total-eth-moved" class="graph-container" style="height:400px;"></div>
+    </div>
+
+    <!-- Correlation Display -->
+    <div id="correlation">Loading correlation...</div>
+
+    <script>
+        // Variables to store data
+        let whaleTransactions = [];
+        let transactionCounts = {
+            whale: 0,
+            significant: 0,
+            small: 0
+        };
+        let totalEthMovedByWhales = 0;
+        let whaleTransactionTimestamps = [];
+        let correlation = 0;
+
+        // Fetch whale transactions and correlation data from the API
+        function fetchData() {
+            fetchWhaleTransactions();
+            fetchCorrelation();
+        }
+
+        // Fetch whale transactions from the API
+        function fetchWhaleTransactions() {
+            fetch('/api/whale_transactions')
+            .then(response => response.json())
+            .then(data => {
+                whaleTransactions = data.whales;
+                transactionCounts = data.transaction_counts;
+                updateGraphs();
+            });
+        }
+
+        // Fetch correlation between whale transactions and ETH prices
+        function fetchCorrelation() {
+            fetch('/api/correlation')
+            .then(response => response.json())
+            .then(data => {
+                correlation = data.correlation;
+                updateCorrelationDisplay();
+            });
+        }
+
+        // Update graphs when new data is fetched
+        function updateGraphs() {
+            updateWhaleGraph();
+            updateWhaleOverTimeGraph();
+            updateTransactionDistribution();
+            updateTotalEthMoved();
+        }
+
+        // Update correlation display
+        function updateCorrelationDisplay() {
+            const correlationDiv = document.getElementById('correlation');
+            correlationDiv.textContent = `Correlation between Whale Transactions and ETH Prices: ${correlation.toFixed(2)}`;
+        }
+
+        // Whale Transaction Bar Graph
+        function updateWhaleGraph() {
+            const txValues = whaleTransactions.map(tx => tx.value);
+            const txHashes = whaleTransactions.map(tx => tx.hash);
+
+            const trace = {
+                x: txHashes,
+                y: txValues,
+                type: 'bar',
+                name: 'Whale Transactions'
+            };
+
+            const layout = {
+                title: 'Whale Transactions in Ethereum',
+                xaxis: {
+                    title: 'Transaction Hash',
+                    showticklabels: false  // Hide the long hashes on x-axis
+                },
+                yaxis: {
+                    title: 'Transaction Value (ETH)'
+                }
+            };
+
+            Plotly.newPlot('whale-graph', [trace], layout);
+        }
+
+        // Line Graph for Whale Transactions Over Time
+        function updateWhaleOverTimeGraph() {
+            whaleTransactionTimestamps = whaleTransactions.map((tx, index) => index);
+
+            const trace = {
+                x: whaleTransactionTimestamps,
+                y: whaleTransactions.map(tx => tx.value),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Whale Transactions Over Time'
+            };
+
+            const layout = {
+                title: 'Whale Transactions Over Time',
+                xaxis: {
+                    title: 'Time'
+                },
+                yaxis: {
+                    title: 'Transaction Value (ETH)'
+                }
+            };
+
+            Plotly.newPlot('whale-over-time', [trace], layout);
+        }
+
+        // Pie Chart for Transaction Distribution
+        function updateTransactionDistribution() {
+            const values = [transactionCounts.whale, transactionCounts.significant, transactionCounts.small];
+            const labels = ['Whale Transactions (>1000 ETH)', 'Significant Transactions (10-1000 ETH)', 'Small Transactions (<10 ETH)'];
+
+            const data = [{
+                values: values,
+                labels: labels,
+                type: 'pie'
+            }];
+
+            const layout = {
+                title: 'Transaction Distribution'
+            };
+
+            Plotly.newPlot('transaction-distribution', data, layout);
+        }
+
+        // Gauge Chart for Total ETH Moved by Whales
+        function updateTotalEthMoved() {
+            totalEthMovedByWhales = whaleTransactions.reduce((acc, tx) => acc + tx.value, 0);
+
+            const data = [{
+                domain: { x: [0, 1], y: [0, 1] },
+                value: totalEthMovedByWhales,
+                title: { text: 'Total ETH Moved by Whale Transactions' },
+                type: 'indicator',
+                mode: 'gauge+number'
+            }];
+
+            const layout = {
+                title: 'Total ETH Moved by Whale Transactions'
+            };
+
+            Plotly.newPlot('total-eth-moved', data, layout);
+        }
+
+        // Fetch and update the graphs every 10 seconds
+        setInterval(fetchData, 10000);
+        fetchData();  // Initial load
+    </script>
+</body>
+</html>
